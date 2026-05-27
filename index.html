@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f766e" />
+    <title>Daily Command Center</title>
+    <link rel="stylesheet" href="./styles.css?v=3" />
+    <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script defer src="./app.js?v=5"></script>
+  </head>
+  <body>
+    <div class="auth-screen" id="authScreen">
+      <section class="auth-card" aria-labelledby="authTitle">
+        <div class="brand-lock" aria-hidden="true">
+          <span></span>
+        </div>
+        <div>
+          <p class="eyebrow">Private tracker</p>
+          <h1 id="authTitle">Daily Command Center</h1>
+        </div>
+        <form id="loginForm" class="stack">
+          <label>
+            Username
+            <input name="username" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button class="primary-btn" type="submit">
+            <i data-lucide="log-in"></i>
+            Enter
+          </button>
+          <p class="form-error" id="loginError" role="alert"></p>
+        </form>
+      </section>
+    </div>
+
+    <div class="app-shell hidden" id="appShell">
+      <aside class="sidebar">
+        <div class="app-mark">
+          <div class="mark-grid" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div>
+            <strong>Command</strong>
+            <span>Daily tracker</span>
+          </div>
+        </div>
+        <nav class="nav-list" aria-label="Main sections">
+          <button class="nav-item is-active" data-view="overview">
+            <i data-lucide="layout-dashboard"></i>
+            Overview
+          </button>
+          <button class="nav-item" data-view="budget">
+            <i data-lucide="wallet"></i>
+            Budget
+          </button>
+          <button class="nav-item" data-view="routine">
+            <i data-lucide="calendar-check"></i>
+            Routine
+          </button>
+          <button class="nav-item" data-view="timer">
+            <i data-lucide="timer"></i>
+            Timer
+          </button>
+          <button class="nav-item" data-view="projects">
+            <i data-lucide="folder-kanban"></i>
+            Projects
+          </button>
+          <button class="nav-item" data-view="notes">
+            <i data-lucide="notebook-pen"></i>
+            Notes
+          </button>
+          <button class="nav-item" data-view="friends">
+            <i data-lucide="users"></i>
+            Friends
+          </button>
+          <button class="nav-item" data-view="settings">
+            <i data-lucide="settings"></i>
+            Settings
+          </button>
+        </nav>
+        <button class="ghost-btn sidebar-logout" id="logoutButton" type="button">
+          <i data-lucide="log-out"></i>
+          Lock
+        </button>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="todayLabel"></p>
+            <h2 id="viewTitle">Overview</h2>
+          </div>
+          <div class="topbar-actions">
+            <button class="icon-btn" id="notifyButton" type="button" title="Enable notifications" aria-label="Enable notifications">
+              <i data-lucide="bell"></i>
+            </button>
+            <button class="icon-btn" id="exportButton" type="button" title="Export backup" aria-label="Export backup">
+              <i data-lucide="download"></i>
+            </button>
+            <label class="icon-btn file-label" title="Import backup" aria-label="Import backup">
+              <i data-lucide="upload"></i>
+              <input id="importInput" type="file" accept="application/json" />
+            </label>
+          </div>
+        </header>
+
+        <section class="view is-active" id="overviewView" data-title="Overview"></section>
+        <section class="view" id="budgetView" data-title="Budget"></section>
+        <section class="view" id="routineView" data-title="Routine"></section>
+        <section class="view" id="timerView" data-title="Project Timer"></section>
+        <section class="view" id="projectsView" data-title="Projects & Work"></section>
+        <section class="view" id="notesView" data-title="Notes"></section>
+        <section class="view" id="friendsView" data-title="Friends"></section>
+        <section class="view" id="settingsView" data-title="Settings"></section>
+      </main>
+    </div>
+  </body>
+</html>
