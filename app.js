@@ -4,6 +4,9 @@ const FILE_DB = "daily-command-files";
 const FILE_STORE = "files";
 const AUTH = { username: "595", password: "595" };
 const CURRENCIES = ["AZN", "USD", "EUR", "AED"];
+const APP_INSTANCE_ID = uid();
+const STARTUP_POSITIONING =
+  "RunwayOS is a local-first money and execution cockpit for ambitious builders who need one place to manage cash, time, commitments, projects, notes, and growth experiments.";
 const RATE_FALLBACK = {
   base: "USD",
   rates: { USD: 1, AZN: 1.7, EUR: 0.92, AED: 3.6725 },
@@ -23,6 +26,8 @@ const defaultState = () => ({
     targetSavingPercent: 20,
     wakeTime: "08:00",
     sleepTime: "00:00",
+    segment: "solo founder / student builder",
+    northStar: "ship profitable projects without losing control of money or time",
   },
   rates: RATE_FALLBACK,
   budget: {
@@ -56,6 +61,45 @@ const defaultState = () => ({
   },
   projects: [],
   notes: [],
+  startup: {
+    mrr: 0,
+    customers: 0,
+    weeklyLeads: 0,
+    conversionRate: 5,
+    arpu: 19,
+    runwayTargetMonths: 6,
+    market: "AI personal finance + execution OS for Gen Z builders and solo operators",
+    wedge: "multi-currency cash control plus project ROI and accountability",
+  },
+  growth: {
+    experiments: [
+      {
+        id: uid(),
+        title: "Invite 5 friends to use the tracker with you",
+        channel: "referral",
+        metric: "activated users",
+        target: 5,
+        current: 0,
+        status: "planned",
+        due: "",
+        learning: "Manual invites prove whether shared accountability is real.",
+      },
+      {
+        id: uid(),
+        title: "Publish one build-in-public demo",
+        channel: "content",
+        metric: "waitlist signups",
+        target: 20,
+        current: 0,
+        status: "running",
+        due: "",
+        learning: "Content should sell the pain: money leaks + time leaks.",
+      },
+    ],
+  },
+  trash: {
+    notes: [],
+  },
   friends: {
     room: "omar-595",
     collaborators: [],
@@ -128,10 +172,11 @@ function setupBroadcast() {
   if (!("BroadcastChannel" in window)) return;
   channel = new BroadcastChannel("daily-command-center");
   channel.onmessage = (event) => {
-    if (!event.data || event.data.type !== "state" || suppressBroadcast) return;
-    if (event.data.state?.updatedAt > state.updatedAt) {
-      state = sanitizeState(event.data.state);
-      persist(false);
+    if (!event.data || event.data.type !== "state" || event.data.instanceId === APP_INSTANCE_ID || suppressBroadcast) return;
+    const incoming = sanitizeState(event.data.state || {});
+    if (incoming.updatedAt > state.updatedAt) {
+      state = mergeStates(state, incoming);
+      persist(false, { touch: false });
       render();
     }
   };
@@ -180,8 +225,11 @@ function handleClick(event) {
   if (type === "delete-project") deleteProject(id);
   if (type === "download-file") downloadFile(projectId, id);
   if (type === "delete-file") deleteProjectFile(projectId, id);
-  if (type === "delete-note") removeById(state.notes, id);
+  if (type === "delete-note") deleteNote(id);
   if (type === "pin-note") toggleNotePin(id);
+  if (type === "delete-experiment") removeById(state.growth.experiments, id);
+  if (type === "toggle-experiment") cycleExperimentStatus(id);
+  if (type === "copy-pitch") copyText(investorPitch());
   if (type === "delete-collaborator") removeById(state.friends.collaborators, id);
   if (type === "copy-invite") copyInvite();
   if (type === "export-backup") exportBackup();
@@ -215,6 +263,8 @@ function handleClick(event) {
     "delete-file",
     "delete-note",
     "pin-note",
+    "delete-experiment",
+    "toggle-experiment",
     "delete-collaborator",
   ]);
   if (persistedActions.has(type)) {
@@ -361,9 +411,37 @@ function handleSubmit(event) {
       title: clean(data.get("title")),
       tags: clean(data.get("tags")),
       body: clean(data.get("body")),
+      type: clean(data.get("type")) || "Decision",
       pinned: Boolean(data.get("pinned")),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    });
+  }
+
+  if (type === "startup") {
+    state.profile.segment = clean(data.get("segment")) || state.profile.segment;
+    state.profile.northStar = clean(data.get("northStar")) || state.profile.northStar;
+    state.startup.mrr = toNumber(data.get("mrr"));
+    state.startup.customers = toNumber(data.get("customers"));
+    state.startup.weeklyLeads = toNumber(data.get("weeklyLeads"));
+    state.startup.conversionRate = toNumber(data.get("conversionRate"));
+    state.startup.arpu = toNumber(data.get("arpu"));
+    state.startup.runwayTargetMonths = toNumber(data.get("runwayTargetMonths")) || 6;
+    state.startup.market = clean(data.get("market")) || state.startup.market;
+    state.startup.wedge = clean(data.get("wedge")) || state.startup.wedge;
+  }
+
+  if (type === "experiment") {
+    state.growth.experiments.unshift({
+      id: uid(),
+      title: clean(data.get("title")),
+      channel: clean(data.get("channel")),
+      metric: clean(data.get("metric")),
+      target: toNumber(data.get("target")),
+      current: toNumber(data.get("current")),
+      status: clean(data.get("status")) || "planned",
+      due: clean(data.get("due")),
+      learning: clean(data.get("learning")),
     });
   }
 
@@ -446,6 +524,7 @@ function setView(view) {
 function render() {
   if (!isAuthed()) return;
   renderOverview();
+  renderStrategy();
   renderBudget();
   renderRoutine();
   renderTimer();
@@ -465,9 +544,24 @@ function renderOverview() {
   const upcoming = upcomingDeadlines().slice(0, 5);
   const activeTimer = state.timer.active ? getProject(state.timer.active.projectId) : null;
   const focus = state.routine.focus.filter((item) => item.date === todayISO());
+  const score = investorScore();
+  const runway = runwayMonths(totalWallets, monthSpent);
+  const growth = growthSummary();
 
   $("#overviewView").innerHTML = `
     ${pendingInvite ? inviteBanner() : ""}
+    <section class="hero-panel">
+      <div>
+        <p class="eyebrow">Founder command brief</p>
+        <h3>${escapeHtml(STARTUP_POSITIONING)}</h3>
+        <p>Current wedge: ${escapeHtml(state.startup.wedge)}. North star: ${escapeHtml(state.profile.northStar)}.</p>
+      </div>
+      <div class="hero-metrics">
+        <span><strong>${score}</strong>Investor score</span>
+        <span><strong>${runway}</strong>Runway months</span>
+        <span><strong>${growth.active}</strong>Live experiments</span>
+      </div>
+    </section>
     <div class="grid four">
       ${statCard("Total money", formatMoney(totalWallets, base), `${state.budget.wallets.length} wallets`)}
       ${statCard("Spent this month", formatMoney(monthSpent, base), `${expensesThisMonth().length} entries`)}
@@ -528,6 +622,121 @@ function renderOverview() {
           ${CURRENCIES.map((currency) => `<span class="currency-pill">1 USD = ${formatNumber(state.rates.rates[currency] || 0)} ${currency}</span>`).join("")}
         </div>
         <p class="rate-source"><a href="https://www.exchangerate-api.com" target="_blank" rel="noreferrer">Rates by Exchange Rate API</a></p>
+      </section>
+    </div>
+  `;
+}
+
+function renderStrategy() {
+  const base = state.profile.baseCurrency;
+  const totalWallets = state.budget.wallets.reduce((sum, wallet) => sum + convert(wallet.balance, wallet.currency, base), 0);
+  const monthSpent = expensesThisMonth().reduce((sum, expense) => sum + convert(expense.amount, expense.currency, base), 0);
+  const score = investorScore();
+  const growth = growthSummary();
+  const warnings = investorWarnings(totalWallets, monthSpent);
+
+  $("#strategyView").innerHTML = `
+    <section class="hero-panel">
+      <div>
+        <p class="eyebrow">Venture-scale repositioning</p>
+        <h3>From budget tracker to RunwayOS: the money-and-execution layer for builders.</h3>
+        <p>Investors will not fund a generic habit app. They might fund a trusted operating system that links cash, time, projects, decisions, and growth into compounding personal data.</p>
+      </div>
+      <div class="hero-metrics">
+        <span><strong>${score}/100</strong>fundability</span>
+        <span><strong>${formatMoney(state.startup.mrr, base)}</strong>MRR</span>
+        <span><strong>${growth.progress}%</strong>experiment progress</span>
+      </div>
+    </section>
+
+    <div class="grid three">
+      ${statCard("Runway", `${runwayMonths(totalWallets, monthSpent)} mo`, `${formatMoney(totalWallets, base)} available`)}
+      ${statCard("Customers", String(state.startup.customers), `${state.startup.weeklyLeads} leads / week`)}
+      ${statCard("ARPU", formatMoney(state.startup.arpu, base), `${state.startup.conversionRate}% conversion target`)}
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>Investor Readiness</h3>
+          <p>What would stop a serious seed investor today.</p>
+        </div>
+        <button class="secondary-btn" data-action="copy-pitch" type="button"><i data-lucide="copy"></i>Copy pitch</button>
+      </div>
+      <div class="grid three">
+        ${warnings.map((warning) => `<article class="warning-card"><strong>${escapeHtml(warning.title)}</strong><p>${escapeHtml(warning.detail)}</p><span>${escapeHtml(warning.fix)}</span></article>`).join("")}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>Startup Settings</h3>
+          <p>Make the product legible as a company, not a side project.</p>
+        </div>
+      </div>
+      <form class="form-grid" data-form="startup">
+        <label class="wide">Target user <input name="segment" value="${escapeAttr(state.profile.segment)}" /></label>
+        <label class="wide">North star <input name="northStar" value="${escapeAttr(state.profile.northStar)}" /></label>
+        <label>MRR <input name="mrr" type="text" inputmode="decimal" value="${state.startup.mrr}" /></label>
+        <label>Customers <input name="customers" type="text" inputmode="numeric" value="${state.startup.customers}" /></label>
+        <label>Weekly leads <input name="weeklyLeads" type="text" inputmode="numeric" value="${state.startup.weeklyLeads}" /></label>
+        <label>Conversion % <input name="conversionRate" type="text" inputmode="decimal" value="${state.startup.conversionRate}" /></label>
+        <label>ARPU <input name="arpu" type="text" inputmode="decimal" value="${state.startup.arpu}" /></label>
+        <label>Runway target <input name="runwayTargetMonths" type="text" inputmode="numeric" value="${state.startup.runwayTargetMonths}" /></label>
+        <label class="wide">Market <input name="market" value="${escapeAttr(state.startup.market)}" /></label>
+        <label class="wide">Wedge <input name="wedge" value="${escapeAttr(state.startup.wedge)}" /></label>
+        <button class="primary-btn" type="submit"><i data-lucide="save"></i>Save strategy</button>
+      </form>
+    </section>
+
+    <div class="grid two">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Growth Experiments</h3>
+            <p>Retention and virality are not wishes. Track them like product work.</p>
+          </div>
+        </div>
+        <form class="form-grid" data-form="experiment">
+          <label class="wide">Experiment <input name="title" placeholder="Launch TikTok demo, referral challenge, student waitlist" required /></label>
+          <label>Channel
+            <select name="channel"><option>referral</option><option>content</option><option>campus</option><option>creator</option><option>community</option><option>paid</option></select>
+          </label>
+          <label>Metric <input name="metric" placeholder="activated users" /></label>
+          <label>Target <input name="target" type="text" inputmode="numeric" value="10" /></label>
+          <label>Current <input name="current" type="text" inputmode="numeric" value="0" /></label>
+          <label>Status
+            <select name="status"><option>planned</option><option>running</option><option>won</option><option>lost</option></select>
+          </label>
+          <label>Due <input name="due" type="date" /></label>
+          <label class="full">Learning <input name="learning" placeholder="What must be true for this to work?" /></label>
+          <button class="primary-btn" type="submit"><i data-lucide="flask-conical"></i>Add experiment</button>
+        </form>
+        <div class="list">
+          ${state.growth.experiments.map(experimentRow).join("") || empty("No growth experiments yet.")}
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Pricing & Monetization</h3>
+            <p>Stop thinking free tracker. Think prosumer wedge, then team expansion.</p>
+          </div>
+        </div>
+        <table class="compact-table">
+          <thead><tr><th>Plan</th><th>Price</th><th>Who pays</th></tr></thead>
+          <tbody>
+            <tr><td>Starter</td><td>$9/mo</td><td>students and solo builders</td></tr>
+            <tr><td>Pro</td><td>$19/mo</td><td>creators, freelancers, indie hackers</td></tr>
+            <tr><td>Team</td><td>$12/user/mo</td><td>small creator teams and clubs</td></tr>
+            <tr><td>Campus</td><td>$2-4/user/mo</td><td>schools, bootcamps, accelerators</td></tr>
+          </tbody>
+        </table>
+        <div class="list">
+          ${strategicRoadmap().map((item) => `<article class="list-row"><div><h4>${escapeHtml(item.title)}</h4><p class="muted">${escapeHtml(item.body)}</p></div><span class="pill">${escapeHtml(item.when)}</span></article>`).join("")}
+        </div>
       </section>
     </div>
   `;
@@ -882,12 +1091,15 @@ function renderNotes() {
       <div class="panel-head">
         <div>
           <h3>Notes</h3>
-          <p>Ideas, daily logs, decisions, passwords hints, anything.</p>
+          <p>Decision log, customer notes, risks, ideas, and proof that the product is learning.</p>
         </div>
       </div>
       <form class="form-grid" data-form="note">
         <label class="wide">Title <input name="title" required /></label>
-        <label class="wide">Tags <input name="tags" placeholder="life, money, project" /></label>
+        <label>Type
+          <select name="type"><option>Decision</option><option>Customer</option><option>Risk</option><option>Idea</option><option>Meeting</option><option>Metric</option></select>
+        </label>
+        <label>Tags <input name="tags" placeholder="life, money, project" /></label>
         <label class="full">Body <textarea name="body" required></textarea></label>
         <label class="checkline"><input name="pinned" type="checkbox" /> Pin note</label>
         <button class="primary-btn" type="submit"><i data-lucide="notebook-pen"></i>Save note</button>
@@ -896,7 +1108,7 @@ function renderNotes() {
 
     <div class="search-row">
       <input id="noteSearch" placeholder="Search notes" value="${escapeAttr(noteSearch)}" />
-      <span class="pill">${notes.length} notes</span>
+      <span class="pill">${notes.length} notes saved locally</span>
     </div>
 
     <div class="grid three">
@@ -1271,8 +1483,10 @@ function noteCard(note) {
         <div>
           <h3>${escapeHtml(note.title)}</h3>
           <div class="pill-row">
+            <span class="status-pill">${escapeHtml(note.type || "Decision")}</span>
             ${note.pinned ? `<span class="status-pill warn">pinned</span>` : ""}
             ${note.tags ? note.tags.split(",").map((tag) => `<span class="pill">${escapeHtml(tag.trim())}</span>`).join("") : ""}
+            <span class="pill">${new Date(note.updatedAt || note.createdAt || Date.now()).toLocaleDateString()}</span>
           </div>
         </div>
         <div class="row-actions">
@@ -1293,6 +1507,31 @@ function collaboratorRow(person) {
         <div class="pill-row"><span class="pill">${escapeHtml(person.role || "viewer")}</span><span class="pill">${new Date(person.addedAt).toLocaleDateString()}</span></div>
       </div>
       <button class="ghost-btn" data-action="delete-collaborator" data-id="${person.id}" type="button"><i data-lucide="trash-2"></i></button>
+    </article>
+  `;
+}
+
+function experimentRow(experiment) {
+  const progress = percent(experiment.current || 0, experiment.target || 0);
+  return `
+    <article class="list-row">
+      <div>
+        <div class="row-head">
+          <h4>${escapeHtml(experiment.title)}</h4>
+          <span class="status-pill ${experiment.status === "won" ? "done" : experiment.status === "lost" ? "danger" : "warn"}">${escapeHtml(experiment.status)}</span>
+        </div>
+        <div class="progress" aria-label="${progress}% complete"><span style="--value:${Math.min(progress, 100)}%"></span></div>
+        <div class="pill-row">
+          <span class="pill">${escapeHtml(experiment.channel)}</span>
+          <span class="pill">${escapeHtml(experiment.metric || "metric")} ${experiment.current || 0}/${experiment.target || 0}</span>
+          ${experiment.due ? `<span class="pill">${escapeHtml(experiment.due)}</span>` : ""}
+        </div>
+        ${experiment.learning ? `<p class="muted">${escapeHtml(experiment.learning)}</p>` : ""}
+      </div>
+      <div class="row-actions">
+        <button class="secondary-btn" data-action="toggle-experiment" data-id="${experiment.id}" type="button"><i data-lucide="rotate-cw"></i></button>
+        <button class="ghost-btn" data-action="delete-experiment" data-id="${experiment.id}" type="button"><i data-lucide="trash-2"></i></button>
+      </div>
     </article>
   `;
 }
@@ -1350,6 +1589,18 @@ function toggleNotePin(id) {
     note.pinned = !note.pinned;
     note.updatedAt = new Date().toISOString();
   }
+}
+
+function deleteNote(id) {
+  removeById(state.notes, id);
+  state.trash.notes = Array.from(new Set([...(state.trash.notes || []), id])).slice(-500);
+}
+
+function cycleExperimentStatus(id) {
+  const experiment = state.growth.experiments.find((item) => item.id === id);
+  if (!experiment) return;
+  const statuses = ["planned", "running", "won", "lost"];
+  experiment.status = statuses[(statuses.indexOf(experiment.status) + 1) % statuses.length];
 }
 
 function markDeadline(id) {
@@ -1721,11 +1972,16 @@ async function copyText(text) {
   }
 }
 
-function persist(shouldBroadcast = true) {
-  state.updatedAt = Date.now();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function persist(shouldBroadcast = true, options = { touch: true }) {
+  if (options.touch !== false) state.updatedAt = Date.now();
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    toast("Save failed. Export a backup, then remove old files or huge notes.");
+    throw error;
+  }
   if (shouldBroadcast && channel) {
-    channel.postMessage({ type: "state", state });
+    channel.postMessage({ type: "state", state, instanceId: APP_INSTANCE_ID });
   }
 }
 
@@ -1740,6 +1996,11 @@ function loadState() {
 
 function sanitizeState(input) {
   const base = defaultState();
+  const trash = {
+    ...base.trash,
+    ...(input.trash || {}),
+    notes: input.trash?.notes || input.deletedNotes || [],
+  };
   return {
     ...base,
     ...input,
@@ -1761,7 +2022,14 @@ function sanitizeState(input) {
     },
     timer: { active: input.timer?.active || null, sessions: input.timer?.sessions || [] },
     projects: input.projects || [],
-    notes: input.notes || [],
+    notes: normalizeNotes(input.notes || [], trash.notes),
+    startup: { ...base.startup, ...(input.startup || {}) },
+    growth: {
+      ...base.growth,
+      ...(input.growth || {}),
+      experiments: input.growth?.experiments || base.growth.experiments,
+    },
+    trash,
     friends: { ...base.friends, ...(input.friends || {}) },
     settings: {
       ...base.settings,
@@ -1770,6 +2038,82 @@ function sanitizeState(input) {
       remote: { ...base.settings.remote, ...(input.settings?.remote || {}) },
     },
   };
+}
+
+function normalizeNotes(notes, deletedIds = []) {
+  const deleted = new Set(deletedIds || []);
+  return (notes || [])
+    .filter((note) => note && note.id && !deleted.has(note.id))
+    .map((note) => ({
+      id: note.id,
+      title: clean(note.title) || "Untitled note",
+      tags: clean(note.tags),
+      body: clean(note.body),
+      type: clean(note.type) || "Decision",
+      pinned: Boolean(note.pinned),
+      createdAt: note.createdAt || note.updatedAt || new Date().toISOString(),
+      updatedAt: note.updatedAt || note.createdAt || new Date().toISOString(),
+    }));
+}
+
+function mergeStates(localState, incomingState) {
+  const local = sanitizeState(localState);
+  const incoming = sanitizeState(incomingState);
+  const trash = {
+    notes: Array.from(new Set([...(local.trash?.notes || []), ...(incoming.trash?.notes || [])])),
+  };
+  return sanitizeState({
+    ...local,
+    ...incoming,
+    profile: incoming.updatedAt >= local.updatedAt ? incoming.profile : local.profile,
+    rates: incoming.rates?.updated === local.rates?.updated ? local.rates : incoming.rates,
+    budget: {
+      wallets: mergeCollection(local.budget.wallets, incoming.budget.wallets),
+      expenses: mergeCollection(local.budget.expenses, incoming.budget.expenses),
+      plans: mergeCollection(local.budget.plans, incoming.budget.plans),
+      goals: mergeCollection(local.budget.goals, incoming.budget.goals),
+    },
+    routine: {
+      tasks: mergeCollection(local.routine.tasks, incoming.routine.tasks),
+      deadlines: mergeCollection(local.routine.deadlines, incoming.routine.deadlines),
+      habits: mergeCollection(local.routine.habits, incoming.routine.habits),
+      health: mergeCollection(local.routine.health, incoming.routine.health, "date"),
+      focus: mergeCollection(local.routine.focus, incoming.routine.focus),
+      reviews: mergeCollection(local.routine.reviews, incoming.routine.reviews),
+    },
+    timer: {
+      active: incoming.timer.active || local.timer.active,
+      sessions: mergeCollection(local.timer.sessions, incoming.timer.sessions),
+    },
+    projects: mergeCollection(local.projects, incoming.projects),
+    notes: mergeCollection(local.notes, incoming.notes).filter((note) => !trash.notes.includes(note.id)),
+    startup: incoming.updatedAt >= local.updatedAt ? incoming.startup : local.startup,
+    growth: { experiments: mergeCollection(local.growth.experiments, incoming.growth.experiments) },
+    friends: {
+      ...incoming.friends,
+      collaborators: mergeCollection(local.friends.collaborators, incoming.friends.collaborators),
+    },
+    settings: incoming.updatedAt >= local.updatedAt ? incoming.settings : local.settings,
+    trash,
+    updatedAt: Math.max(local.updatedAt || 0, incoming.updatedAt || 0),
+  });
+}
+
+function mergeCollection(left = [], right = [], key = "id") {
+  const map = new Map();
+  [...left, ...right].forEach((item) => {
+    if (!item) return;
+    const id = item[key] || item.id || JSON.stringify(item);
+    const existing = map.get(id);
+    if (!existing) {
+      map.set(id, item);
+      return;
+    }
+    const existingTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+    const itemTime = new Date(item.updatedAt || item.createdAt || 0).getTime();
+    map.set(id, itemTime >= existingTime ? { ...existing, ...item } : { ...item, ...existing });
+  });
+  return Array.from(map.values());
 }
 
 function encodeState(value) {
@@ -1816,6 +2160,86 @@ function projectTimeRows() {
       </article>
     `)
     .join("") || empty("No project time yet.");
+}
+
+function runwayMonths(totalWallets, monthlySpend) {
+  if (!monthlySpend) return totalWallets > 0 ? "∞" : "0.0";
+  return (totalWallets / monthlySpend).toFixed(1);
+}
+
+function growthSummary() {
+  const experiments = state.growth?.experiments || [];
+  const active = experiments.filter((item) => item.status === "running").length;
+  const won = experiments.filter((item) => item.status === "won").length;
+  const totalProgress = experiments.reduce((sum, item) => sum + Math.min(percent(item.current || 0, item.target || 0), 100), 0);
+  return {
+    active,
+    won,
+    progress: experiments.length ? Math.round(totalProgress / experiments.length) : 0,
+  };
+}
+
+function investorScore() {
+  const base = state.profile.baseCurrency;
+  const totalWallets = state.budget.wallets.reduce((sum, wallet) => sum + convert(wallet.balance, wallet.currency, base), 0);
+  const monthSpent = expensesThisMonth().reduce((sum, expense) => sum + convert(expense.amount, expense.currency, base), 0);
+  const runway = Number(runwayMonths(totalWallets, monthSpent));
+  const experiments = state.growth?.experiments || [];
+  let score = 18;
+  if (state.notes.length >= 3) score += 10;
+  if (state.projects.length >= 1) score += 10;
+  if (state.timer.sessions.length >= 3) score += 8;
+  if (state.routine.focus.some((item) => item.done)) score += 6;
+  if (state.startup.customers > 0) score += 14;
+  if (state.startup.mrr > 0) score += 18;
+  if (experiments.some((item) => item.status === "running")) score += 8;
+  if (Number.isFinite(runway) && runway >= state.startup.runwayTargetMonths) score += 8;
+  return Math.min(score, 100);
+}
+
+function investorWarnings(totalWallets, monthSpent) {
+  const warnings = [];
+  if (!state.startup.customers) {
+    warnings.push({
+      title: "No customer proof",
+      detail: "A tracker without users is a feature, not a company.",
+      fix: "Talk to 20 target users and log customer notes here.",
+    });
+  }
+  if (!state.startup.mrr) {
+    warnings.push({
+      title: "No monetization signal",
+      detail: "Investors need evidence that users will pay for behavior change.",
+      fix: "Charge $9-19/mo manually before building bank-sync complexity.",
+    });
+  }
+  if ((state.growth?.experiments || []).filter((item) => item.status === "running").length === 0) {
+    warnings.push({
+      title: "No growth loop",
+      detail: "A private dashboard has no natural distribution.",
+      fix: "Run referral, campus, and build-in-public experiments weekly.",
+    });
+  }
+  if (!monthSpent && totalWallets === 0) {
+    warnings.push({
+      title: "No real data",
+      detail: "Empty dashboards are not defensible and do not create habit.",
+      fix: "Force a 90-second onboarding that captures wallet, goal, and first note.",
+    });
+  }
+  return warnings.slice(0, 6);
+}
+
+function strategicRoadmap() {
+  return [
+    { when: "30 days", title: "Retention wedge", body: "Fix persistence, add onboarding, import/export, weekly review, and one killer insight: money leak vs time leak." },
+    { when: "90 days", title: "Network wedge", body: "Shared rooms, accountability groups, referrals, campus ambassadors, and creator templates." },
+    { when: "12 months", title: "Data moat", body: "Bank sync, AI categorization, receipt parsing, project ROI, benchmark graph, and privacy-first personal data vault." },
+  ];
+}
+
+function investorPitch() {
+  return `RunwayOS is a local-first money and execution cockpit for ${state.profile.segment}. It combines multi-currency cash control, project time ROI, notes, deadlines, and growth experiments so ambitious builders can see whether their money and time are compounding. Wedge: ${state.startup.wedge}. North star: ${state.profile.northStar}. Current MRR: ${state.startup.mrr}. Customers: ${state.startup.customers}.`;
 }
 
 function habitStreak(habit) {
