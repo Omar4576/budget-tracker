@@ -3,11 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0f766e" />
-    <title>Daily Command Center</title>
-    <link rel="stylesheet" href="./styles.css?v=3" />
+    <meta name="theme-color" content="#111827" />
+    <title>RunwayOS</title>
+    <link rel="stylesheet" href="./styles.css?v=8" />
     <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-    <script defer src="./app.js?v=5"></script>
+    <script defer src="./app.js?v=8"></script>
   </head>
   <body>
     <div class="auth-screen" id="authScreen">
@@ -16,8 +16,14 @@
           <span></span>
         </div>
         <div>
-          <p class="eyebrow">Private tracker</p>
-          <h1 id="authTitle">Daily Command Center</h1>
+          <p class="eyebrow">Private operating system</p>
+          <h1 id="authTitle">RunwayOS</h1>
+          <p class="auth-copy">Money, time, notes, deadlines, projects, and growth loops in one execution dashboard.</p>
+          <div class="auth-proof">
+            <span>Multi-currency</span>
+            <span>Founder-grade</span>
+            <span>Local-first</span>
+          </div>
         </div>
         <form id="loginForm" class="stack">
           <label>
@@ -44,14 +50,18 @@
             <span></span><span></span><span></span><span></span>
           </div>
           <div>
-            <strong>Command</strong>
-            <span>Daily tracker</span>
+            <strong>RunwayOS</strong>
+            <span>Execution cockpit</span>
           </div>
         </div>
         <nav class="nav-list" aria-label="Main sections">
           <button class="nav-item is-active" data-view="overview">
             <i data-lucide="layout-dashboard"></i>
             Overview
+          </button>
+          <button class="nav-item" data-view="strategy">
+            <i data-lucide="rocket"></i>
+            Strategy
           </button>
           <button class="nav-item" data-view="budget">
             <i data-lucide="wallet"></i>
@@ -109,6 +119,7 @@
         </header>
 
         <section class="view is-active" id="overviewView" data-title="Overview"></section>
+        <section class="view" id="strategyView" data-title="Strategy"></section>
         <section class="view" id="budgetView" data-title="Budget"></section>
         <section class="view" id="routineView" data-title="Routine"></section>
         <section class="view" id="timerView" data-title="Project Timer"></section>
