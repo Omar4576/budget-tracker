@@ -2,12 +2,14 @@
   --bg: #f6f7f9;
   --surface: #ffffff;
   --surface-2: #eef7f4;
+  --surface-3: #f2f5ff;
   --ink: #17202a;
   --muted: #697585;
   --line: #d9e1e8;
   --teal: #0f766e;
   --teal-2: #14b8a6;
   --blue: #2563eb;
+  --violet: #7c3aed;
   --rose: #e11d48;
   --amber: #b7791f;
   --green: #15803d;
@@ -78,6 +80,31 @@ a {
   border-radius: 8px;
   box-shadow: var(--shadow);
   padding: 32px;
+}
+
+.auth-copy {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: -12px 0 18px;
+}
+
+.auth-proof {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.auth-proof span {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
 }
 
 .brand-lock {
@@ -392,6 +419,60 @@ button svg,
   gap: 18px;
 }
 
+.hero-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid rgba(15, 118, 110, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(37, 99, 235, 0.1)),
+    var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.hero-panel h3 {
+  max-width: 860px;
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  line-height: 1.08;
+  margin-bottom: 10px;
+}
+
+.hero-panel p {
+  color: var(--muted);
+  margin-bottom: 0;
+}
+
+.hero-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(94px, 1fr));
+  gap: 10px;
+}
+
+.hero-metrics span,
+.warning-card {
+  min-height: 86px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.hero-metrics strong {
+  display: block;
+  color: var(--ink);
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
 .grid {
   display: grid;
   gap: 16px;
@@ -413,7 +494,8 @@ button svg,
 .stat,
 .list-row,
 .note-card,
-.project-card {
+.project-card,
+.warning-card {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -445,6 +527,25 @@ button svg,
   margin: 12px 0 0;
   color: var(--muted);
   font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.warning-card {
+  align-content: start;
+  min-height: 150px;
+}
+
+.warning-card strong {
+  color: var(--rose);
+}
+
+.warning-card p {
+  color: var(--ink);
+  margin-bottom: 0;
+}
+
+.warning-card span {
+  color: var(--muted);
   font-weight: 800;
 }
 
@@ -787,6 +888,14 @@ button svg,
 
   .grid.four,
   .grid.three {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-metrics {
     grid-template-columns: 1fr;
   }
 
