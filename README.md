@@ -1,26 +1,54 @@
-# Daily Command Center
+# RunwayOS
 
-A private daily tracking dashboard built as a static website.
+RunwayOS is a local-first money and execution cockpit for ambitious builders. It combines multi-currency budgeting, project time ROI, deadlines, notes, weekly routines, and growth experiments so a user can see whether their money and time are compounding.
+
+## Investor Positioning
+
+The old product was a simple daily tracker. The venture-scale version is a personal operating system for solo founders, students, creators, freelancers, and small teams who need one place to manage cash runway, work sessions, commitments, decisions, and distribution experiments.
 
 ## Login
 
 - Username: `595`
 - Password: `595`
 
-This is a simple client-side gate for a static GitHub Pages site. For real security across the internet, put the app behind a backend auth service.
+This is a static client-side gate. It is convenient for a demo, but it is not real security. Production needs backend auth, encrypted sync, and per-user data isolation.
 
-## Features
+## What Changed
 
-- Budget wallets, spending, money plans, savings goals, and currency conversion for `AZN`, `USD`, `EUR`, and `AED`
-- Live exchange-rate refresh from `https://open.er-api.com/v6/latest/USD`
-- Daily routine, deadlines, browser alerts, and GitHub issue draft links
-- Project timer that survives refreshes and stores daily sessions
-- Project/work upload storage in browser IndexedDB
-- Notes, habits, health check-ins, top-3 priorities, weekly reviews, backup/import, invite links, and optional remote JSON sync
+- Rebranded from Daily Command Center to RunwayOS
+- Added Strategy dashboard with investor score, runway, startup metrics, growth experiments, pricing model, and roadmap
+- Fixed note persistence by making local saves safer and merging notes across tabs instead of allowing stale state to overwrite new notes
+- Added note types for decisions, customers, risks, ideas, meetings, and metrics
+- Added storage failure warnings so the user knows when browser storage fails
+- Kept budget, routine, timer, projects, friends, notes, backup/import, and optional remote sync
+
+## Venture Roadmap
+
+### 30 Days
+
+- Fix persistence and onboarding
+- Add customer interview logging
+- Add 90-second setup: wallet, savings goal, project, first note
+- Add weekly review and money/time leak insights
+- Charge manually for first 10 users
+
+### 90 Days
+
+- Add real accounts and encrypted cloud sync
+- Add shared accountability rooms
+- Add referral loops and creator templates
+- Add bank import through a provider
+- Add AI categorization and natural-language note capture
+
+### 12 Months
+
+- Build the personal data moat: spending, time, project ROI, decisions, habits, and outcomes
+- Launch team/campus plans
+- Add benchmarking across anonymous cohorts
+- Add AI financial coach and execution agent
+- Expand from solo users to creator teams, bootcamps, and accelerators
 
 ## Run Locally
-
-From this folder:
 
 ```bash
 python3 -m http.server 5173
@@ -34,6 +62,4 @@ http://localhost:5173
 
 ## GitHub Pages
 
-Upload the `daily-tracker` folder contents to a GitHub repository and enable GitHub Pages. The app stores data in the browser for that domain, so refreshes keep the data.
-
-For true multi-device real-time collaboration, connect the Remote JSON endpoint in Settings to a backend that accepts `GET` and `PUT` JSON at `/ROOM.json` style URLs.
+Serve the repo root from GitHub Pages. Data is stored in the browser for that domain, so refreshes keep the data. Cross-device collaboration requires a real backend or the Remote JSON endpoint.
